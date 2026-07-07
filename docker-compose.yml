@@ -1,0 +1,74 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-weatherwire}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-weatherwire}
+      POSTGRES_DB: ${POSTGRES_DB:-weatherwire}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-weatherwire}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: ./backend
+      target: base
+    command: alembic upgrade head
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://weatherwire:weatherwire@db:5432/weatherwire}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+      target: api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://weatherwire:weatherwire@db:5432/weatherwire}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      INGEST_ONLY: "false"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  ingest:
+    build:
+      context: ./backend
+      target: ingest
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://weatherwire:weatherwire@db:5432/weatherwire}
+      NWWS_USER: ${NWWS_USER}
+      NWWS_PASSWORD: ${NWWS_PASSWORD}
+      INGEST_ONLY: "true"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    environment:
+      API_URL: http://api:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
