@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { VtecActionBadge } from "@/components/VtecActionBadge";
+import { Card } from "@/components/ui/Card";
 import { formatDateTime, getEvent } from "@/lib/api";
 
 type EventDetailPageProps = {
@@ -22,7 +23,10 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
-        <Link href="/events" className="text-sm text-primary hover:underline">
+        <Link
+          href="/events"
+          className="text-sm text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+        >
           Back to VTEC events
         </Link>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">
@@ -32,7 +36,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <VtecActionBadge action={event.latest_action} label={event.latest_action_label} />
           <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+            className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
               event.is_active
                 ? "bg-warning/10 text-warning"
                 : "bg-surface-raised text-text-secondary"
@@ -52,7 +56,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
       </div>
 
       {event.ugc_zones.length > 0 && (
-        <section className="rounded-xl border border-border bg-surface-raised p-4">
+        <Card className="p-4">
           <h2 className="mb-3 text-sm font-medium text-text-secondary">Affected zones</h2>
           <ul className="grid gap-2 text-sm sm:grid-cols-2">
             {event.ugc_zones.map((zone) => (
@@ -62,10 +66,10 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       )}
 
-      <section className="rounded-xl border border-border">
+      <Card className="overflow-hidden">
         <h2 className="border-b border-border px-4 py-3 text-sm font-medium text-text-secondary">
           Event timeline
         </h2>
@@ -79,8 +83,8 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
               </div>
               <p className="mt-2 text-sm">
                 <Link
-                  href={`/messages/${entry.weather_message_id}`}
-                  className="text-primary hover:underline"
+                  href={`/messages/${entry.weather_message_id}?from=events`}
+                  className="text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded"
                 >
                   {entry.summary}
                 </Link>
@@ -93,7 +97,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
             </li>
           ))}
         </ol>
-      </section>
+      </Card>
     </div>
   );
 }

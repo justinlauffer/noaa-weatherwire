@@ -17,7 +17,7 @@ type VtecActionBadgeProps = {
 export function VtecActionBadge({ action, label }: VtecActionBadgeProps) {
   const style = ACTION_STYLES[action] ?? "border-border bg-surface-raised text-text-secondary";
   return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${style}`}>
+    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${style}`}>
       {label ?? action}
     </span>
   );

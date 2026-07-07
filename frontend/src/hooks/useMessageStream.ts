@@ -21,7 +21,10 @@ type UseMessageStreamOptions = {
 
 export function useMessageStream({ enabled = true, onMessage }: UseMessageStreamOptions = {}) {
   const callbackRef = useRef(onMessage);
-  callbackRef.current = onMessage;
+
+  useEffect(() => {
+    callbackRef.current = onMessage;
+  }, [onMessage]);
 
   useEffect(() => {
     if (!enabled) {

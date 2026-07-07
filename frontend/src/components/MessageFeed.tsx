@@ -1,196 +1,133 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 
-import { useMessageStream } from "@/hooks/useMessageStream";
-import { formatDateTime, getHealth, getMessages } from "@/lib/api";
+import { IngestStatusBadge } from "@/components/IngestStatusBadge";
+import { MessageFilters } from "@/components/MessageFilters";
+import { OfficeCell } from "@/components/OfficeCell";
+import { ProductTypeBadge } from "@/components/ProductTypeBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Pagination } from "@/components/ui/Pagination";
+import { ResponsiveDataList, type DataColumn } from "@/components/ui/ResponsiveDataList";
+import { useFeedData } from "@/hooks/useFeedData";
+import { useFeedPagination } from "@/hooks/useFeedPagination";
+import { formatDateTime, getMessages } from "@/lib/api";
 import type { MessageFilters as Filters, OfficeInfo, WeatherMessageSummary } from "@/lib/types";
 
-import { IngestStatusBadge } from "./IngestStatusBadge";
-import { MessageFilters } from "./MessageFilters";
-import { OfficeCell } from "./OfficeCell";
-import { ProductTypeBadge } from "./ProductTypeBadge";
-
 type MessageFeedProps = {
-  initialMessages: WeatherMessageSummary[];
-  initialTotal: number;
-  initialPage: number;
-  hasMore: boolean;
   offices: OfficeInfo[];
   filters: Filters;
 };
 
-const POLL_INTERVAL_MS = 120_000;
+export function MessageFeed({ offices, filters }: MessageFeedProps) {
+  const { page, setPage } = useFeedPagination();
 
-export function MessageFeed({
-  initialMessages,
-  initialTotal,
-  initialPage,
-  hasMore: initialHasMore,
-  offices,
-  filters,
-}: MessageFeedProps) {
-  const [messages, setMessages] = useState(initialMessages);
-  const [total, setTotal] = useState(initialTotal);
-  const [page, setPage] = useState(initialPage);
-  const [hasMore, setHasMore] = useState(initialHasMore);
-  const [error, setError] = useState<string | null>(null);
-  const [liveCount, setLiveCount] = useState(0);
-  const [ingestStatus, setIngestStatus] = useState(
-    null as Awaited<ReturnType<typeof getHealth>>["ingest"],
+  const fetchPage = useCallback(
+    (currentPage: number) => getMessages({ ...filters, page: currentPage }),
+    [filters],
   );
 
-  useEffect(() => {
-    setMessages(initialMessages);
-    setTotal(initialTotal);
-    setPage(initialPage);
-    setHasMore(initialHasMore);
-    setLiveCount(0);
-    setError(null);
-  }, [initialMessages, initialTotal, initialPage, initialHasMore]);
-
-  const refresh = useCallback(async () => {
-    try {
-      const [messagesResponse, health] = await Promise.all([
-        getMessages({ ...filters, page }),
-        getHealth(),
-      ]);
-      setMessages(messagesResponse.items);
-      setTotal(messagesResponse.total);
-      setHasMore(messagesResponse.has_more);
-      setIngestStatus(health.ingest);
-      setError(null);
-    } catch (refreshError) {
-      setError(
-        refreshError instanceof Error ? refreshError.message : "Failed to refresh messages",
-      );
-    }
-  }, [filters, page]);
-
-  useMessageStream({
-    onMessage: () => {
-      setLiveCount((count) => count + 1);
-      if (page === 1) {
-        void refresh();
-      }
-    },
+  const { items, total, hasMore, error, liveCount, loading, ingestStatus } = useFeedData({
+    page,
+    fetchPage,
   });
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      void refresh();
-    }, POLL_INTERVAL_MS);
-    void refresh();
-    return () => window.clearInterval(interval);
-  }, [refresh]);
+  const columns: DataColumn<WeatherMessageSummary>[] = [
+    {
+      key: "received",
+      header: "Received (UTC)",
+      className: "whitespace-nowrap font-mono text-xs",
+      render: (message) => formatDateTime(message.received_at, { seconds: true }),
+    },
+    {
+      key: "type",
+      header: "Type",
+      render: (message) => (
+        <ProductTypeBadge
+          category={message.product_category}
+          typeName={message.product_type_name}
+          productClass={message.product_class}
+          isAlert={message.is_alert}
+        />
+      ),
+    },
+    {
+      key: "office",
+      header: "Office",
+      render: (message) => (
+        <OfficeCell code={message.issuing_office} name={message.issuing_office_name} />
+      ),
+    },
+    {
+      key: "awips",
+      header: "AWIPS",
+      className: "font-mono",
+      hideOnMobile: true,
+      render: (message) => message.awips_id,
+    },
+    {
+      key: "wmo",
+      header: "WMO",
+      className: "font-mono text-text-secondary",
+      hideOnMobile: true,
+      render: (message) => message.wmo_product_id,
+    },
+    {
+      key: "summary",
+      header: "Summary",
+      render: (message) => (
+        <Link
+          href={`/messages/${message.weather_message_id}`}
+          className="text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+        >
+          {message.summary}
+        </Link>
+      ),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Weather Wire Feed</h1>
-          <p className="mt-1 text-sm text-text-secondary">
+      <PageHeader
+        title="Weather Wire Feed"
+        description={
+          <>
             {total.toLocaleString()} products in archive. Live updates via SSE.
             {liveCount > 0 && (
               <span className="ml-2 text-primary">+{liveCount} new since page load</span>
             )}
-          </p>
-        </div>
-        <IngestStatusBadge status={ingestStatus} />
-      </div>
+          </>
+        }
+        trailing={<IngestStatusBadge status={ingestStatus} />}
+      />
 
       <MessageFilters offices={offices} />
 
-      {error && (
-        <div
-          className="rounded-lg border border-error bg-surface-raised px-4 py-3 text-sm text-error"
-          role="alert"
-        >
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} />}
 
-      {messages.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center">
-          <p className="text-lg font-medium">Waiting for the first product</p>
-          <p className="mt-2 text-sm text-text-secondary">
-            Messages appear here once the ingest worker connects to NWWS-OI and receives
-            traffic. Check that your credentials are configured and only one ingest session
-            is running.
-          </p>
-        </div>
+      {items.length === 0 ? (
+        <EmptyState
+          title="Waiting for the first product"
+          description="Messages appear here once the ingest worker connects to NWWS-OI and receives traffic. Check that your credentials are configured and only one ingest session is running."
+        />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border">
-          <table className="min-w-full divide-y divide-border text-sm">
-            <thead className="bg-surface-raised text-left text-text-secondary">
-              <tr>
-                <th className="px-4 py-3 font-medium">Issued (UTC)</th>
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Office</th>
-                <th className="px-4 py-3 font-medium">AWIPS</th>
-                <th className="px-4 py-3 font-medium">WMO</th>
-                <th className="px-4 py-3 font-medium">Summary</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-background">
-              {messages.map((message) => (
-                <tr key={message.weather_message_id} className="hover:bg-surface-raised/60">
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
-                    {formatDateTime(message.issued_at)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <ProductTypeBadge
-                      category={message.product_category}
-                      typeName={message.product_type_name}
-                      productClass={message.product_class}
-                      isAlert={message.is_alert}
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <OfficeCell
-                      code={message.issuing_office}
-                      name={message.issuing_office_name}
-                    />
-                  </td>
-                  <td className="px-4 py-3 font-mono">{message.awips_id}</td>
-                  <td className="px-4 py-3 font-mono text-text-secondary">
-                    {message.wmo_product_id}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/messages/${message.weather_message_id}`}
-                      className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
-                    >
-                      {message.summary}
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveDataList
+          items={items}
+          columns={columns}
+          getRowKey={(message) => message.weather_message_id}
+        />
       )}
 
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          className="rounded-lg border border-border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={page <= 1}
-          onClick={() => setPage((current) => Math.max(1, current - 1))}
-        >
-          Previous
-        </button>
-        <span className="text-sm text-text-secondary">Page {page}</span>
-        <button
-          type="button"
-          className="rounded-lg border border-border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!hasMore}
-          onClick={() => setPage((current) => current + 1)}
-        >
-          Next
-        </button>
-      </div>
+      <Pagination
+        page={page}
+        hasMore={hasMore}
+        loading={loading}
+        onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+      />
     </div>
   );
 }

@@ -7,7 +7,7 @@ type IngestStatusBadgeProps = {
 export function IngestStatusBadge({ status }: IngestStatusBadgeProps) {
   if (!status) {
     return (
-      <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-raised px-3 py-1 text-sm text-text-secondary">
+      <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-raised px-3 py-1 text-sm text-text-secondary transition-colors">
         <span className="h-2 w-2 rounded-full bg-text-tertiary" aria-hidden />
         Ingest status unknown
       </span>
@@ -29,11 +29,11 @@ export function IngestStatusBadge({ status }: IngestStatusBadgeProps) {
   return (
     <div className="flex flex-col gap-1">
       <span
-        className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-raised px-3 py-1 text-sm"
+        className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-raised px-3 py-1 text-sm transition-colors"
         role="status"
         aria-live="polite"
       >
-        <span className={`h-2 w-2 rounded-full ${dotColor}`} aria-hidden />
+        <span className={`h-2 w-2 rounded-full transition-colors ${dotColor}`} aria-hidden />
         {label}
       </span>
       {status.last_error && !connected && (

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 
 import { EventsFeed } from "@/components/EventsFeed";
-import { getEvents } from "@/lib/api";
+import { FeedSkeleton } from "@/components/ui/Skeleton";
 import type { EventFilters } from "@/lib/types";
 
 type EventsPageProps = {
@@ -24,35 +24,12 @@ async function EventsContent({ searchParams }: EventsPageProps) {
     office: getFilterValue(params, "office"),
   };
 
-  let eventsResponse;
-  try {
-    eventsResponse = await getEvents(filters);
-  } catch {
-    return (
-      <div
-        className="rounded-lg border border-error bg-surface-raised px-4 py-3 text-sm text-error"
-        role="alert"
-      >
-        Failed to load VTEC events. Check that the API is running and parsed metadata has been
-        backfilled.
-      </div>
-    );
-  }
-
-  return (
-    <EventsFeed
-      initialEvents={eventsResponse.items}
-      initialTotal={eventsResponse.total}
-      initialPage={eventsResponse.page}
-      hasMore={eventsResponse.has_more}
-      filters={filters}
-    />
-  );
+  return <EventsFeed filters={filters} />;
 }
 
 export default function EventsPage(props: EventsPageProps) {
   return (
-    <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-surface-raised" />}>
+    <Suspense fallback={<FeedSkeleton />}>
       <EventsContent {...props} />
     </Suspense>
   );

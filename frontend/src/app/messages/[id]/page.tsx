@@ -2,14 +2,32 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ProductTypeBadge } from "@/components/ProductTypeBadge";
+import { Card } from "@/components/ui/Card";
 import { formatDateTime, getMessage } from "@/lib/api";
 
 type MessageDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function MessageDetailPage({ params }: MessageDetailPageProps) {
+function getBackLink(from: string | undefined): { href: string; label: string } {
+  switch (from) {
+    case "alerts":
+      return { href: "/alerts", label: "Back to alerts" };
+    case "map":
+      return { href: "/map", label: "Back to map" };
+    case "events":
+      return { href: "/events", label: "Back to VTEC events" };
+    default:
+      return { href: "/", label: "Back to feed" };
+  }
+}
+
+export default async function MessageDetailPage({ params, searchParams }: MessageDetailPageProps) {
   const { id } = await params;
+  const query = await searchParams;
+  const from = typeof query.from === "string" ? query.from : undefined;
+  const backLink = getBackLink(from);
 
   let message;
   try {
@@ -22,10 +40,10 @@ export default async function MessageDetailPage({ params }: MessageDetailPagePro
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
         <Link
-          href="/"
-          className="text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+          href={backLink.href}
+          className="text-sm text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
         >
-          Back to feed
+          {backLink.label}
         </Link>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">{message.summary}</h1>
         <div className="mt-3">
@@ -39,47 +57,49 @@ export default async function MessageDetailPage({ params }: MessageDetailPagePro
             <p className="mt-2 text-sm text-text-secondary">{message.product_type_name}</p>
           )}
         </div>
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-text-secondary">Issued</dt>
-            <dd className="font-mono">{formatDateTime(message.issued_at)}</dd>
-          </div>
-          <div>
-            <dt className="text-text-secondary">Received</dt>
-            <dd className="font-mono">{formatDateTime(message.received_at)}</dd>
-          </div>
-          <div>
-            <dt className="text-text-secondary">Office</dt>
-            <dd>
-              <div className="font-mono">{message.issuing_office}</div>
-              {message.issuing_office_name && (
-                <div className="text-sm text-text-secondary">
-                  {message.issuing_office_name.replace(/^NWS Forecast Office /, "")}
-                </div>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-text-secondary">AWIPS / WMO</dt>
-            <dd className="font-mono">
-              {message.awips_id} / {message.wmo_product_id}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-text-secondary">NWWS ID</dt>
-            <dd className="font-mono">{message.nwws_id}</dd>
-          </div>
-          {message.wmo_heading && (
+        <Card className="mt-4 p-4">
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-text-secondary">WMO heading</dt>
-              <dd className="font-mono">{message.wmo_heading}</dd>
+              <dt className="text-text-secondary">Issued</dt>
+              <dd className="font-mono">{formatDateTime(message.issued_at, { seconds: true })}</dd>
             </div>
-          )}
-        </dl>
+            <div>
+              <dt className="text-text-secondary">Received</dt>
+              <dd className="font-mono">{formatDateTime(message.received_at, { seconds: true })}</dd>
+            </div>
+            <div>
+              <dt className="text-text-secondary">Office</dt>
+              <dd>
+                <div className="font-mono">{message.issuing_office}</div>
+                {message.issuing_office_name && (
+                  <div className="text-sm text-text-secondary">
+                    {message.issuing_office_name.replace(/^NWS Forecast Office /, "")}
+                  </div>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-secondary">AWIPS / WMO</dt>
+              <dd className="font-mono">
+                {message.awips_id} / {message.wmo_product_id}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-secondary">NWWS ID</dt>
+              <dd className="font-mono">{message.nwws_id}</dd>
+            </div>
+            {message.wmo_heading && (
+              <div>
+                <dt className="text-text-secondary">WMO heading</dt>
+                <dd className="font-mono">{message.wmo_heading}</dd>
+              </div>
+            )}
+          </dl>
+        </Card>
       </div>
 
       {message.parsed_metadata && (
-        <section className="rounded-xl border border-border bg-surface-raised p-4">
+        <Card className="p-4">
           <h2 className="mb-3 text-sm font-medium text-text-secondary">Parsed metadata</h2>
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div>
@@ -130,7 +150,7 @@ export default async function MessageDetailPage({ params }: MessageDetailPagePro
                       <td className="px-2 py-2">{entry.significance_label}</td>
                       <td className="px-2 py-2 font-mono">{entry.office}</td>
                       <td className="px-2 py-2 font-mono">{entry.etn}</td>
-                      <td className="px-2 py-2 font-mono whitespace-nowrap">
+                      <td className="whitespace-nowrap px-2 py-2 font-mono">
                         {entry.start_time} – {entry.end_time}
                       </td>
                     </tr>
@@ -139,15 +159,15 @@ export default async function MessageDetailPage({ params }: MessageDetailPagePro
               </table>
             </div>
           )}
-        </section>
+        </Card>
       )}
 
-      <section className="rounded-xl border border-border bg-surface-raised p-4">
+      <Card className="p-4">
         <h2 className="mb-3 text-sm font-medium text-text-secondary">Full bulletin</h2>
         <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-relaxed">
           {message.raw_body}
         </pre>
-      </section>
+      </Card>
     </div>
   );
 }

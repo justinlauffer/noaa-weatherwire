@@ -1,9 +1,14 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState, useTransition } from "react";
 
+import { Checkbox } from "@/components/ui/Checkbox";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatOfficeLabel } from "@/lib/offices";
+import { cn } from "@/lib/utils";
 import type { OfficeInfo } from "@/lib/types";
 
 type MessageFiltersProps = {
@@ -12,8 +17,37 @@ type MessageFiltersProps = {
 
 export function MessageFilters({ offices }: MessageFiltersProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+
+  const [awipsId, setAwipsId] = useState(() => searchParams.get("awips_id") ?? "");
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const [productCategory, setProductCategory] = useState(
+    () => searchParams.get("product_category") ?? "",
+  );
+
+  const debouncedAwipsId = useDebouncedValue(awipsId);
+  const debouncedQuery = useDebouncedValue(query);
+  const debouncedProductCategory = useDebouncedValue(productCategory);
+
+  const searchKey = searchParams.toString();
+
+  useEffect(() => {
+    if (
+      awipsId !== debouncedAwipsId ||
+      query !== debouncedQuery ||
+      productCategory !== debouncedProductCategory
+    ) {
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync inputs when URL changes externally
+    setAwipsId(searchParams.get("awips_id") ?? "");
+    setQuery(searchParams.get("q") ?? "");
+    setProductCategory(searchParams.get("product_category") ?? "");
+    // Sync text inputs when URL changes externally (selects, pagination, navigation).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchKey captures non-text param changes
+  }, [searchKey]);
 
   const updateFilter = useCallback(
     (key: string, value: string) => {
@@ -25,21 +59,49 @@ export function MessageFilters({ offices }: MessageFiltersProps) {
       }
       params.delete("page");
       startTransition(() => {
-        router.push(`/?${params.toString()}`);
+        const queryString = params.toString();
+        router.push(queryString ? `${pathname}?${queryString}` : pathname);
       });
     },
-    [router, searchParams],
+    [pathname, router, searchParams],
   );
+
+  useEffect(() => {
+    const next = debouncedAwipsId.trim();
+    const current = searchParams.get("awips_id") ?? "";
+    if (next !== current) {
+      updateFilter("awips_id", next);
+    }
+  }, [debouncedAwipsId, searchParams, updateFilter]);
+
+  useEffect(() => {
+    const next = debouncedQuery.trim();
+    const current = searchParams.get("q") ?? "";
+    if (next !== current) {
+      updateFilter("q", next);
+    }
+  }, [debouncedQuery, searchParams, updateFilter]);
+
+  useEffect(() => {
+    const next = debouncedProductCategory.trim();
+    const current = searchParams.get("product_category") ?? "";
+    if (next !== current) {
+      updateFilter("product_category", next);
+    }
+  }, [debouncedProductCategory, searchParams, updateFilter]);
 
   return (
     <form
-      className="grid gap-4 rounded-xl border border-border bg-surface-raised p-4 md:grid-cols-2 lg:grid-cols-4"
+      className={cn(
+        "grid gap-4 rounded-xl border border-border bg-surface-raised p-4 transition-opacity md:grid-cols-2 lg:grid-cols-4",
+        isPending && "opacity-70",
+      )}
       onSubmit={(event) => event.preventDefault()}
+      aria-busy={isPending}
     >
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-text-secondary">Office</span>
-        <select
-          className="rounded-lg border border-border bg-background px-3 py-2"
+        <Select
           value={searchParams.get("office") ?? ""}
           onChange={(event) => updateFilter("office", event.target.value)}
           disabled={isPending}
@@ -50,49 +112,47 @@ export function MessageFilters({ offices }: MessageFiltersProps) {
               {formatOfficeLabel(office.code, office.name)}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-text-secondary">AWIPS ID</span>
-        <input
+        <Input
           type="text"
-          className="rounded-lg border border-border bg-background px-3 py-2 uppercase"
+          className="uppercase"
           placeholder="e.g. TORBOU"
-          defaultValue={searchParams.get("awips_id") ?? ""}
-          onBlur={(event) => updateFilter("awips_id", event.target.value.trim())}
+          value={awipsId}
+          onChange={(event) => setAwipsId(event.target.value)}
           disabled={isPending}
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-text-secondary">Search</span>
-        <input
+        <Input
           type="search"
-          className="rounded-lg border border-border bg-background px-3 py-2"
           placeholder="Summary or body text"
-          defaultValue={searchParams.get("q") ?? ""}
-          onBlur={(event) => updateFilter("q", event.target.value.trim())}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
           disabled={isPending}
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-text-secondary">Product type</span>
-        <input
+        <Input
           type="text"
-          className="rounded-lg border border-border bg-background px-3 py-2 uppercase"
+          className="uppercase"
           placeholder="e.g. TOR, FFA, HSF"
-          defaultValue={searchParams.get("product_category") ?? ""}
-          onBlur={(event) => updateFilter("product_category", event.target.value.trim())}
+          value={productCategory}
+          onChange={(event) => setProductCategory(event.target.value)}
           disabled={isPending}
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-text-secondary">Class</span>
-        <select
-          className="rounded-lg border border-border bg-background px-3 py-2"
+        <Select
           value={searchParams.get("product_class") ?? ""}
           onChange={(event) => updateFilter("product_class", event.target.value)}
           disabled={isPending}
@@ -104,13 +164,11 @@ export function MessageFilters({ offices }: MessageFiltersProps) {
           <option value="statement">Statements</option>
           <option value="forecast">Forecasts</option>
           <option value="marine">Marine</option>
-        </select>
+        </Select>
       </label>
 
-      <label className="flex items-center gap-2 text-sm md:col-span-2 lg:col-span-4">
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-border"
+      <label className="flex min-h-11 items-center gap-2 text-sm md:col-span-2 lg:col-span-4">
+        <Checkbox
           defaultChecked={searchParams.get("alerts_only") === "true"}
           onChange={(event) =>
             updateFilter("alerts_only", event.target.checked ? "true" : "")
@@ -121,10 +179,9 @@ export function MessageFilters({ offices }: MessageFiltersProps) {
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-text-secondary">Since (UTC)</span>
-        <input
+        <span className="text-text-secondary">Received since (UTC)</span>
+        <Input
           type="datetime-local"
-          className="rounded-lg border border-border bg-background px-3 py-2"
           defaultValue={searchParams.get("since")?.slice(0, 16) ?? ""}
           onBlur={(event) => {
             const value = event.target.value
