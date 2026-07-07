@@ -76,9 +76,9 @@ async def list_messages(
     if alerts_only:
         filters.append(WeatherMessage.is_alert.is_(True))
     if since:
-        filters.append(WeatherMessage.issued_at >= since)
+        filters.append(WeatherMessage.received_at >= since)
     if until:
-        filters.append(WeatherMessage.issued_at <= until)
+        filters.append(WeatherMessage.received_at <= until)
     if q:
         pattern = f"%{q}%"
         filters.append(
@@ -90,7 +90,7 @@ async def list_messages(
         count_stmt = count_stmt.where(*filters)
     total = (await session.execute(count_stmt)).scalar_one()
 
-    stmt = select(WeatherMessage).order_by(WeatherMessage.issued_at.desc()).offset(offset).limit(page_size)
+    stmt = select(WeatherMessage).order_by(WeatherMessage.received_at.desc()).offset(offset).limit(page_size)
     if filters:
         stmt = stmt.where(*filters)
     rows = (await session.execute(stmt)).scalars().all()

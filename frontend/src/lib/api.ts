@@ -104,13 +104,14 @@ export async function getMapFeatures(filters: MapLayerFilter = { layers: { warni
   return fetchJson(`/api/v1/map/features${buildMapQuery(filters)}`);
 }
 
-export function formatDateTime(iso: string): string {
+export function formatDateTime(iso: string, options?: { seconds?: boolean }): string {
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    ...(options?.seconds ? { second: "2-digit" } : {}),
     timeZone: "UTC",
     timeZoneName: "short",
   }).format(new Date(iso));
